@@ -11,7 +11,6 @@ async function getAllUsers(req: Request, res: Response) {
     const db = await getDatabase();
     const [result] = await db.query("SELECT * FROM users");
     const users = result as User[];
-    db.end();
     res.json(users);
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -24,4 +23,4 @@ async function getAllUsers(req: Request, res: Response) {
   }
 }
 
-export { getAllUsers };
+export { getAllUsers};
