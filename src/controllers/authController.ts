@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
-import hashPassword from "../utils/hashPassword";
-import { getDatabase } from "../services/databaseConnector";
 import { RowDataPacket } from "mysql2/promise";
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
-async function signUp(req: Request, res: Response) {
+import { settings } from "../config/settings";
+import { hashPassword } from "../utils/hashPassword";
+import { getDatabase } from "../services/databaseConnector";
+
+export async function signUp(req: Request, res: Response) {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -43,7 +46,7 @@ async function signUp(req: Request, res: Response) {
   }
 }
 
-async function signIn(req: Request, res: Response) {
+export async function signIn(req: Request, res: Response) {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -53,29 +56,50 @@ async function signIn(req: Request, res: Response) {
 
   try {
     const db = await getDatabase();
-    
-    const [user] = await db.query<RowDataPacket[]>(
-      "SELECT username, password FROM users WHERE username = ? LIMIT 1;",
+
+    const [rows] = await db.query<RowDataPacket[]>(
+      "SELECT id, username, password FROM users WHERE username = ? LIMIT 1;",
       [username]
     );
 
-    if (user.length === 0) {
+    if (rows.length === 0) {
       res.status(400).json({ message: "Invalid username or password" });
       return;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user[0].password);
+    const user = rows[0];
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       res.status(400).json({ message: "Invalid username or password" });
       return;
     }
 
-    res.status(200).json({ message: "Login successful", user: { username: user } });
+    const token = jwt.sign({ userId: user.id }, settings.jwt.secret, {
+      expiresIn: "1h",
+    });
+
+    res.cookie("kind-remind-login-token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 3600000,
+    });
+    res.status(200).json({ message: "Login successful" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error logging in" });
   }
 }
 
-export { signUp, signIn };
+export function logout(req: Request, res: Response) {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+
+  res.status(200).json({ message: "Logged out successfully" });
+};

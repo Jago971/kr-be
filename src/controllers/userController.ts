@@ -6,7 +6,7 @@ type User = {
   username: string;
 };
 
-async function getAllUsers(req: Request, res: Response) {
+export async function getAllUsers(req: Request, res: Response) {
   try {
     const db = await getDatabase();
     const [result] = await db.query("SELECT * FROM users");
@@ -22,5 +22,3 @@ async function getAllUsers(req: Request, res: Response) {
     res.status(500).send("Internal server error");
   }
 }
-
-export { getAllUsers};
