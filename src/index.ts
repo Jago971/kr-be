@@ -1,7 +1,7 @@
-import express from "express";
+import express from 'express';
 import cors from "cors";
 import { getAllUsers } from "./controllers/userController";
-import { logout, signIn, signUp } from "./controllers/authController";
+import { logOut, logIn, signUp } from "./controllers/authController";
 
 const app = express();
 const port = 3002;
@@ -16,14 +16,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-app.get("/", (req, res) => {
-  res.send("Server is running!");
-});
-
 app.get("/users", getAllUsers);
 app.post("/signup", signUp);
-app.post("/signin", signIn);
-app.post("/logout", logout);
+app.post("/login", logIn);
+app.post("/logout", logOut);
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
