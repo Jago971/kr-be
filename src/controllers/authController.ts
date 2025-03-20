@@ -121,7 +121,7 @@ export function logOut(req: Request, res: Response) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production", // Secure in production
     sameSite: "strict",
-    path: "/", // Ensure it matches the original cookie's path
+    path: "/login", // Ensure it matches the original cookie's path
   });
 
   res.status(200).json({ message: "Logout successful" });

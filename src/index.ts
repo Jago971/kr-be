@@ -17,7 +17,7 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // allows reading of form data
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(authRoutes); // include the auth routes
 app.use(protectedRoutes) // include the protected routes
