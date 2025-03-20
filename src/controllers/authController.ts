@@ -1,22 +1,10 @@
 import { Request, Response } from "express";
 import { ResultSetHeader, RowDataPacket, Connection } from "mysql2/promise";
-import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 import { hashPassword } from "../utils/hashPassword";
 import { getDatabase } from "../services/databaseConnector";
-
-export const generateAccessToken = (userId: string) => {
-  return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET as string, {
-    expiresIn: "15m",
-  });
-};
-
-export const generateRefreshToken = (userId: string) => {
-  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET as string, {
-    expiresIn: "7d",
-  });
-};
+import { generateAccessToken, generateRefreshToken } from "../utils/generateJWT";
 
 async function checkUserExists(db: Connection, username: string): Promise<boolean> {
   const [rows] = await db.query<RowDataPacket[]>(
@@ -114,7 +102,13 @@ export async function logIn(req: Request, res: Response) {
     const refreshToken = generateRefreshToken(user.id);
 
     // Set token in cookie
-    res.cookie("refreshToken", refreshToken, { httpOnly: true, secure: false });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     res.status(200).json({ message: "Login successful", accessToken });
   } catch (error) {
     console.error(error);
@@ -123,12 +117,12 @@ export async function logIn(req: Request, res: Response) {
 }
 
 export function logOut(req: Request, res: Response) {
-  res.clearCookie("kind-remind-login-token", {
+  res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production", // Secure in production
     sameSite: "strict",
-    path: "/",
+    path: "/", // Ensure it matches the original cookie's path
   });
 
-  res.status(200).json({ message: "Log out successful" });
+  res.status(200).json({ message: "Logout successful" });
 }
