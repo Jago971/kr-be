@@ -8,8 +8,8 @@ interface User {
 
 // Middleware to verify the access token
 export function verifyAccessToken(req: Request, res: Response, next: NextFunction) {
-  const accessToken = req.headers["authorization"]?.split(" ")[1]; // Access token from Authorization header
-  const refreshToken = req.cookies.refreshToken; // Assuming refresh token is stored in cookies
+  const accessToken = req.headers["authorization"]?.split(" ")[1];
+  const refreshToken = req.cookies.refreshToken;
 
   if (!accessToken) {
     res.status(401).json({ message: "Access token missing" });
@@ -33,7 +33,7 @@ export function verifyAccessToken(req: Request, res: Response, next: NextFunctio
 
         // If refresh token is valid, generate a new access token
         const newAccessToken = generateAccessToken(refreshDecoded.userId);
-        res.setHeader("Authorization", `Bearer ${newAccessToken}`); // Optionally send the new access token in the header
+        res.setHeader("Authorization", `Bearer ${newAccessToken}`);
         (req as any).user = refreshDecoded as User; // Attach the decoded user info to the request object
         return next();
       });
