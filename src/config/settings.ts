@@ -10,7 +10,8 @@ const settings = {
     port: Number(process.env.DB_PORT) || 3307,
   },
   jwt: {
-    secret: process.env.JWT_SECRET || "default-secret",
+    accesSecret: process.env.JWT_ACCESS_SECRET || "default-secret",
+    refreshSecret: process.env.JWT_REFRESH_SECRET || "default-secret",
   },
 };
 

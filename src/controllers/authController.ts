@@ -1,11 +1,31 @@
 import { Request, Response } from "express";
-import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { ResultSetHeader, RowDataPacket, Connection } from "mysql2/promise";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
-import { settings } from "../config/settings";
 import { hashPassword } from "../utils/hashPassword";
 import { getDatabase } from "../services/databaseConnector";
+
+export const generateAccessToken = (userId: string) => {
+  return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET as string, {
+    expiresIn: "15m",
+  });
+};
+
+export const generateRefreshToken = (userId: string) => {
+  return jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET as string, {
+    expiresIn: "7d",
+  });
+};
+
+async function checkUserExists(db: Connection, username: string): Promise<boolean> {
+  const [rows] = await db.query<RowDataPacket[]>(
+    "SELECT username FROM users WHERE username = ? LIMIT 1;",
+    [username]
+  );
+
+  return rows.length > 0;
+}
 
 export async function signUp(req: Request, res: Response) {
   const { username, email, password } = req.body;
@@ -22,15 +42,10 @@ export async function signUp(req: Request, res: Response) {
     const db = await getDatabase();
 
     // Check if user already exists
-    const [existingUser] = await db.query<RowDataPacket[]>(
-      "SELECT username FROM users WHERE username = ? LIMIT 1;",
-      [username]
-    );
+    const userExists = await checkUserExists(db, username);
 
-    if (existingUser.length > 0) {
-      res.status(400).json({
-        message: "User already exists",
-      });
+    if (userExists) {
+      res.status(400).json({ message: "User already exists" });
       return;
     }
 
@@ -42,24 +57,11 @@ export async function signUp(req: Request, res: Response) {
       [username, email, hashedPassword]
     );
 
-    // Create JWT token
-    const token = jwt.sign(
-      { userId: result[0].insertId },
-      settings.jwt.secret,
-      {
-        expiresIn: "1h",
-      }
-    );
-
-    // Set token in cookie
-    res.cookie("kind-remind-login-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 3600000,
+    const userId = result[0].insertId;
+    res.status(201).json({
+      message: "User created successfully.",
+      userId,
     });
-
-    res.status(201).json({ message: "Sign up successful", user: { username } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error signing up" });
@@ -77,6 +79,14 @@ export async function logIn(req: Request, res: Response) {
 
   try {
     const db = await getDatabase();
+
+    // Check if user already exists
+    const userExists = await checkUserExists(db, username);
+
+    if (!userExists) {
+      res.status(400).json({ message: "User does not exist. Sign up" });
+      return;
+    }
 
     // Get user from database
     const [rows] = await db.query<RowDataPacket[]>(
@@ -99,20 +109,13 @@ export async function logIn(req: Request, res: Response) {
       return;
     }
 
-    // Create JWT token
-    const token = jwt.sign({ userId: user.id }, settings.jwt.secret, {
-      expiresIn: "1h",
-    });
+    // Create JWT tokens
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
 
     // Set token in cookie
-    res.cookie("kind-remind-login-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 3600000,
-    });
-
-    res.status(200).json({ message: "Log in successful" });
+    res.cookie("refreshToken", refreshToken, { httpOnly: true, secure: false });
+    res.status(200).json({ message: "Login successful", accessToken });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error logging in" });
