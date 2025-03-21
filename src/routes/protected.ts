@@ -4,7 +4,7 @@ import { verifyAccessToken } from "../middleware/verifyJWT";
 const router = express.Router();
 
 // Protected route
-router.get("/home", verifyAccessToken, (req, res) => {
+router.get("/kind-remind/home", verifyAccessToken, (req, res) => {
   const userId = (req as any).user?.userId;
   const currentAccessToken = req.headers["authorization"]?.split(" ")[1];
   
@@ -25,7 +25,7 @@ router.get("/home", verifyAccessToken, (req, res) => {
   });
 });
 
-router.get("/tasks", verifyAccessToken, (req, res) => {
+router.get("/kind-remind/tasks", verifyAccessToken, (req, res) => {
   const userId = (req as any).user?.userId;
   const currentAccessToken = req.headers["authorization"]?.split(" ")[1];
   
@@ -46,7 +46,7 @@ router.get("/tasks", verifyAccessToken, (req, res) => {
   });
 });
 
-router.get("/messages", verifyAccessToken, (req, res) => {
+router.get("/kind-remind/messages", verifyAccessToken, (req, res) => {
   const userId = (req as any).user?.userId;
   const currentAccessToken = req.headers["authorization"]?.split(" ")[1];
   

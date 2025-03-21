@@ -4,9 +4,15 @@ import bcrypt from "bcryptjs";
 
 import { hashPassword } from "../utils/hashPassword";
 import { getDatabase } from "../services/databaseConnector";
-import { generateAccessToken, generateRefreshToken } from "../utils/generateJWT";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "../utils/generateJWT";
 
-async function checkUserExists(db: Connection, username: string): Promise<boolean> {
+async function checkUserExists(
+  db: Connection,
+  username: string
+): Promise<boolean> {
   const [rows] = await db.query<RowDataPacket[]>(
     "SELECT username FROM users WHERE username = ? LIMIT 1;",
     [username]
@@ -20,9 +26,11 @@ export async function signUp(req: Request, res: Response) {
 
   // Check if username, email, and password are provided
   if (!username || !email || !password) {
-    res
-      .status(400)
-      .json({ message: "Username, email, and password are required" });
+    res.status(400).json({
+      status: "error",
+      message: "Username, email, and password are required",
+      redirect: false,
+    });
     return;
   }
 
@@ -33,7 +41,11 @@ export async function signUp(req: Request, res: Response) {
     const userExists = await checkUserExists(db, username);
 
     if (userExists) {
-      res.status(400).json({ message: "User already exists" });
+      res.status(400).json({
+        status: "error",
+        message: "User already exists",
+        redirect: true,
+      });
       return;
     }
 
@@ -47,12 +59,17 @@ export async function signUp(req: Request, res: Response) {
 
     const userId = result[0].insertId;
     res.status(201).json({
-      message: "User created successfully.",
-      userId,
+      status: "success",
+      message: "User created successfully",
+      redirect: true,
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error signing up" });
+    res.status(500).json({
+      status: "error",
+      message: "Error signing up",
+      redirect: false,
+    });
   }
 }
 
@@ -61,7 +78,12 @@ export async function logIn(req: Request, res: Response) {
 
   // Check if username and password are provided
   if (!username || !password) {
-    res.status(400).json({ message: "Username and password are required" });
+    res.status(400).json({
+      status: "error",
+      message: "Username and password are required",
+      userId: null,
+      accessToken: null,
+    });
     return;
   }
 
@@ -72,7 +94,13 @@ export async function logIn(req: Request, res: Response) {
     const userExists = await checkUserExists(db, username);
 
     if (!userExists) {
-      res.status(400).json({ message: "User does not exist. Sign up" });
+      res.status(400).json({
+        status: "error",
+        message: "User does not exist",
+        userId: null,
+        accessToken: null,
+        redirect: false,
+      });
       return;
     }
 
@@ -84,7 +112,13 @@ export async function logIn(req: Request, res: Response) {
 
     // Check if user exists
     if (rows.length === 0) {
-      res.status(400).json({ message: "Invalid username or password" });
+      res.status(400).json({
+        status: "error",
+        message: "Invalid username or password",
+        userId: null,
+        accessToken: null,
+        redirect: false,
+      });
       return;
     }
 
@@ -93,7 +127,13 @@ export async function logIn(req: Request, res: Response) {
     // Check if password is valid
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      res.status(400).json({ message: "Invalid username or password" });
+      res.status(400).json({
+        status: "error",
+        message: "Invalid username or password",
+        userId: null,
+        accessToken: null,
+        redirect: false,
+      });
       return;
     }
 
@@ -109,10 +149,22 @@ export async function logIn(req: Request, res: Response) {
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    res.status(200).json({ message: "Login successful", accessToken });
+    res.status(200).json({
+      status: "success",
+      message: "Login successful",
+      userId: user.id,
+      accessToken: accessToken,
+      redirect: true,
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Error logging in" });
+    res.status(500).json({
+      status: "error",
+      message: "Error logging in",
+      userId: null,
+      accessToken: null,
+      redirect: false,
+    });
   }
 }
 
@@ -121,8 +173,8 @@ export function logOut(req: Request, res: Response) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production", // Secure in production
     sameSite: "strict",
-    path: "/login", // Ensure it matches the original cookie's path
+    path: "/", // Ensure it matches the original cookie's path
   });
 
-  res.status(200).json({ message: "Logout successful" });
+  res.status(200).json({ status: "success", message: "Logout successful" });
 }
