@@ -83,6 +83,7 @@ export async function logIn(req: Request, res: Response) {
       message: "Username and password are required",
       userId: null,
       accessToken: null,
+      redirect: false,
     });
     return;
   }
@@ -176,5 +177,7 @@ export function logOut(req: Request, res: Response) {
     path: "/", // Ensure it matches the original cookie's path
   });
 
-  res.status(200).json({ status: "success", message: "Logout successful" });
+  res
+    .status(200)
+    .json({ status: "success", message: "Logout successful", redirect: true });
 }
