@@ -2,123 +2,67 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { generateAccessToken } from "../utils/generateJWT";
 
-interface User {
-  userId: number;
+// Extend Request interface to include user and accessToken
+interface AuthenticatedRequest extends Request {
+  user?: { userId: number };
+  accessToken?: string;
 }
 
 // Middleware to verify the access token
-export function verifyAccessToken(req: Request, res: Response, next: NextFunction) {
+export function verifyAccessToken(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const accessToken = req.headers["authorization"]?.split(" ")[1];
   const refreshToken = req.cookies.refreshToken;
 
+  // Standard response shape
+  const responseTemplate = {
+    status: "error",
+    message: "",
+    userId: null,
+    accessToken: null,
+    newAccessToken: null,
+    redirect: true
+  };
+
   if (!accessToken) {
-    res.status(401).json({ message: "Access token missing" });
+    res.status(401).json({ ...responseTemplate, message: "Access token missing" });
     return;
   }
 
   jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET as string, (err: any, decoded: any) => {
     if (err && err.name === "TokenExpiredError") {
-      // Access token has expired, check for refresh token
       if (!refreshToken) {
-        res.status(401).json({ message: "Refresh token missing" });
+        res.status(401).json({ ...responseTemplate, message: "Refresh token missing" });
         return;
       }
 
-      // If refresh token exists, verify it and generate a new access token
       jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string, (refreshErr: any, refreshDecoded: any) => {
         if (refreshErr) {
-          res.status(403).json({ message: "Invalid refresh token" });
+          res.status(403).json({ ...responseTemplate, message: "Invalid refresh token" });
           return;
         }
 
         // If refresh token is valid, generate a new access token
         const newAccessToken = generateAccessToken(refreshDecoded.userId);
         res.setHeader("Authorization", `Bearer ${newAccessToken}`);
-        (req as any).user = refreshDecoded as User; // Attach the decoded user info to the request object
-        return next();
+
+        req.user = { userId: refreshDecoded.userId };
+        req.accessToken = newAccessToken;
+
+        next();
+        return;
       });
       return;
     }
 
     if (err) {
-      res.status(403).json({ message: "Invalid or expired token" });
+      res.status(403).json({ ...responseTemplate, message: "Invalid or expired token" });
       return;
     }
 
-    (req as any).user = decoded as User; // Attach user data to request
+    req.user = { userId: decoded.userId };
+    req.accessToken = accessToken;
+
     next();
+    return;
   });
 }
-
-// import { Request, Response, NextFunction } from "express";
-// import jwt from "jsonwebtoken";
-// import { generateAccessToken } from "../utils/generateJWT";
-
-// interface User {
-//   userId: number;
-// }
-
-// export function verifyAccessToken(req: Request, res: Response, next: NextFunction) {
-//   const accessToken = req.headers["authorization"]?.split(" ")[1];
-//   const refreshToken = req.cookies.refreshToken;
-
-//   // Standard response structure
-//   const responseTemplate = {
-//     status: "error",
-//     message: "",
-//     redirect: false
-//   };
-
-//   if (!accessToken) {
-//     responseTemplate.message = "Access token missing";
-//     return res.status(401).json(responseTemplate);
-//   }
-
-//   jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET as string, (err: any, decoded: any) => {
-//     if (err && err.name === "TokenExpiredError") {
-//       // Access token has expired, check for refresh token
-//       if (!refreshToken) {
-//         responseTemplate.message = "Refresh token missing";
-//         return res.status(401).json(responseTemplate);
-//       }
-
-//       // If refresh token exists, verify it and generate a new access token
-//       jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string, (refreshErr: any, refreshDecoded: any) => {
-//         if (refreshErr) {
-//           responseTemplate.message = "Invalid refresh token";
-//           return res.status(403).json(responseTemplate);
-//         }
-
-//         // If refresh token is valid, generate a new access token
-//         const newAccessToken = generateAccessToken(refreshDecoded.userId);
-//         res.setHeader("Authorization", `Bearer ${newAccessToken}`);
-//         (req as any).user = refreshDecoded as User; // Attach the decoded user info to the request object
-//         (req as any).responseData = {
-//           ...responseTemplate,
-//           status: "success",
-//           message: "Token refreshed successfully",
-//           redirect: true
-//         };
-        
-//         return next();
-//       });
-//       return;
-//     }
-
-//     if (err) {
-//       responseTemplate.message = "Invalid or expired token";
-//       return res.status(403).json(responseTemplate);
-//     }
-
-//     // Attach user data to request and add standard response
-//     (req as any).user = decoded as User;
-//     (req as any).responseData = {
-//       ...responseTemplate,
-//       status: "success",
-//       message: "Token valid",
-//       redirect: false
-//     };
-
-//     next();
-//   });
-// }

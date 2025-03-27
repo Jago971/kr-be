@@ -29,6 +29,8 @@ export async function signUp(req: Request, res: Response) {
     res.status(400).json({
       status: "error",
       message: "Username, email, and password are required",
+      userId: null,
+      accessToken: null,
       redirect: false,
     });
     return;
@@ -44,6 +46,8 @@ export async function signUp(req: Request, res: Response) {
       res.status(400).json({
         status: "error",
         message: "User already exists",
+        userId: null,
+        accessToken: null,
         redirect: true,
       });
       return;
@@ -58,9 +62,12 @@ export async function signUp(req: Request, res: Response) {
     );
 
     const userId = result[0].insertId;
+    
     res.status(201).json({
       status: "success",
       message: "User created successfully",
+      userId: userId,
+      accessToken: null,
       redirect: true,
     });
   } catch (error) {
@@ -68,6 +75,8 @@ export async function signUp(req: Request, res: Response) {
     res.status(500).json({
       status: "error",
       message: "Error signing up",
+      userId: null,
+      accessToken: null,
       redirect: false,
     });
   }
