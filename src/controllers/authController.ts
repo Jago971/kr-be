@@ -79,7 +79,7 @@ export async function signUp(req: Request, res: Response): Promise<void> {
         console.error(error);
         res.status(500).json({
             ...responseTemplate,
-            message: "Error signing up",
+            message: "Server error",
         });
     }
 }
@@ -158,7 +158,7 @@ export async function logIn(req: Request, res: Response): Promise<void> {
         console.error(error);
         res.status(500).json({
             ...responseTemplate,
-            message: "Error logging in",
+            message: "Server error",
         });
     }
 }
