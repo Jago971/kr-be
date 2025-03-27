@@ -172,6 +172,7 @@ export function logOut(req: Request, res: Response): void {
     });
 
     res.status(200).json({
+        ...responseTemplate,
         status: "success",
         message: "Logout successful",
     });
