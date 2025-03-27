@@ -4,15 +4,9 @@ import bcrypt from "bcryptjs";
 
 import { hashPassword } from "../utils/hashPassword";
 import { getDatabase } from "../services/databaseConnector";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../utils/generateJWT";
+import { generateAccessToken, generateRefreshToken } from "../utils/generateJWT";
 
-async function checkUserExists(
-  db: Connection,
-  username: string
-): Promise<boolean> {
+async function checkUserExists(db: Connection, username: string): Promise<boolean> {
   const [rows] = await db.query<RowDataPacket[]>(
     "SELECT username FROM users WHERE username = ? LIMIT 1;",
     [username]
@@ -21,18 +15,19 @@ async function checkUserExists(
   return rows.length > 0;
 }
 
+const responseTemplate = {
+  status: "error",
+  message: "",
+  userId: null,
+  accessToken: null,
+  redirect: false,
+};
+
 export async function signUp(req: Request, res: Response) {
   const { username, email, password } = req.body;
 
-  // Check if username, email, and password are provided
   if (!username || !email || !password) {
-    res.status(400).json({
-      status: "error",
-      message: "Username, email, and password are required",
-      userId: null,
-      accessToken: null,
-      redirect: false,
-    });
+    res.status(400).json({ ...responseTemplate, message: "Username, email, and password are required" });
     return;
   }
 
@@ -43,13 +38,7 @@ export async function signUp(req: Request, res: Response) {
     const userExists = await checkUserExists(db, username);
 
     if (userExists) {
-      res.status(400).json({
-        status: "error",
-        message: "User already exists",
-        userId: null,
-        accessToken: null,
-        redirect: true,
-      });
+      res.status(400).json({ ...responseTemplate, message: "User already exists", redirect: true });
       return;
     }
 
@@ -72,13 +61,7 @@ export async function signUp(req: Request, res: Response) {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      status: "error",
-      message: "Error signing up",
-      userId: null,
-      accessToken: null,
-      redirect: false,
-    });
+    res.status(500).json({ ...responseTemplate, message: "Error signing up" });
   }
 }
 
@@ -87,13 +70,7 @@ export async function logIn(req: Request, res: Response) {
 
   // Check if username and password are provided
   if (!username || !password) {
-    res.status(400).json({
-      status: "error",
-      message: "Username and password are required",
-      userId: null,
-      accessToken: null,
-      redirect: false,
-    });
+    res.status(400).json({ ...responseTemplate, message: "Username and password are required" });
     return;
   }
 
@@ -104,13 +81,7 @@ export async function logIn(req: Request, res: Response) {
     const userExists = await checkUserExists(db, username);
 
     if (!userExists) {
-      res.status(400).json({
-        status: "error",
-        message: "User does not exist",
-        userId: null,
-        accessToken: null,
-        redirect: false,
-      });
+      res.status(400).json({ ...responseTemplate, message: "User does not exist" });
       return;
     }
 
@@ -122,13 +93,7 @@ export async function logIn(req: Request, res: Response) {
 
     // Check if user exists
     if (rows.length === 0) {
-      res.status(400).json({
-        status: "error",
-        message: "Invalid username or password",
-        userId: null,
-        accessToken: null,
-        redirect: false,
-      });
+      res.status(400).json({ ...responseTemplate, message: "Invalid username or password" });
       return;
     }
 
@@ -137,13 +102,7 @@ export async function logIn(req: Request, res: Response) {
     // Check if password is valid
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      res.status(400).json({
-        status: "error",
-        message: "Invalid username or password",
-        userId: null,
-        accessToken: null,
-        redirect: false,
-      });
+      res.status(400).json({ ...responseTemplate, message: "Invalid username or password" });
       return;
     }
 
@@ -159,6 +118,7 @@ export async function logIn(req: Request, res: Response) {
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
     res.status(200).json({
       status: "success",
       message: "Login successful",
@@ -168,25 +128,23 @@ export async function logIn(req: Request, res: Response) {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      status: "error",
-      message: "Error logging in",
-      userId: null,
-      accessToken: null,
-      redirect: false,
-    });
+    res.status(500).json({ ...responseTemplate, message: "Error logging in" });
   }
 }
 
 export function logOut(req: Request, res: Response) {
   res.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // Secure in production
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    path: "/", // Ensure it matches the original cookie's path
+    path: "/",
   });
 
-  res
-    .status(200)
-    .json({ status: "success", message: "Logout successful", redirect: true });
+  res.status(200).json({
+    status: "success",
+    message: "Logout successful",
+    userId: null,
+    accessToken: null,
+    redirect: true,
+  });
 }
