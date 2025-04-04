@@ -31,6 +31,15 @@ export function verifyAccessToken(
         return;
     }
 
+    if (!refreshToken) {
+        console.log("Refresh token missing");
+        res.status(401).json({
+            ...responseTemplate,
+            message: "Refresh token missing",
+        });
+        return;
+    }
+
     jwt.verify(
         accessToken,
         process.env.JWT_ACCESS_SECRET as string,

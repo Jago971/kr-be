@@ -1,10 +1,10 @@
 import express from "express";
-import { signUp, logIn, logOut } from "../controllers/authController";
+import { signup, login, logout } from "../controllers/authController";
 
 const router = express.Router();
 
-router.post("/kind-remind/signup", signUp);
-router.post("/kind-remind/login", logIn);
-router.post("/kind-remind/logout", logOut);
+router.post("/kind-remind/signup", signup);
+router.post("/kind-remind/login", login);
+router.post("/kind-remind/logout", logout);
 
 export default router;
