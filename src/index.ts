@@ -2,8 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import authRoutes from "./routes/auth";
-import protectedRoutes from "./routes/protected";
+import authRoutes from "./auth/auth.routes";
+import protectedRoutes from "./user/user.routes";
 
 const port = 3002;
 const corsOptions = {
@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true })); // allows reading of form data
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(authRoutes); // include the auth routes
-app.use(protectedRoutes) // include the protected routes
+app.use(protectedRoutes); // include the protected routes
 
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);

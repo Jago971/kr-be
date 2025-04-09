@@ -1,10 +1,13 @@
+//#region Imports
+
 import express from "express";
-import { verifyAccessToken } from "../middleware/verifyJWT";
-import { getDashboard, getProfile } from "../controllers/protectedController";
+import { verifyAccessToken } from "../common/middleware/validateJWT";
+import { getDashboard, getProfile } from "./user.controller";
+
+//#endregion Imports
 
 const router = express.Router();
 
-// dashbaord route
 router.get("/kind-remind/dashboard", verifyAccessToken, getDashboard);
 router.get("/kind-remind/profile", verifyAccessToken, getProfile);
 

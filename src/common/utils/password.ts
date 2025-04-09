@@ -6,6 +6,10 @@ export async function hashPassword(password: string): Promise<string> {
     const hashedPassword = await bcrypt.hash(password, salt);
     return hashedPassword;
   } catch (error) {
-    throw new Error("Error hashing password");
+    throw new Error(
+      `Error hashing password: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
   }
 }

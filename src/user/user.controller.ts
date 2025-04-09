@@ -1,11 +1,23 @@
+//#region Imports
+
 import { Request, Response } from "express";
-import { getDatabase } from "../services/databaseConnector";
+import { getDatabase } from "../common/database/connector";
+
+//#endregion Imports
+
+//#region Constants
 
 const responseTemplate = {
   status: "error",
   message: "",
   data: {},
 };
+
+//#endregion Constants
+
+//#region Functions
+
+//#region getDashboard
 
 export const getDashboard = async (
   req: Request,
@@ -79,6 +91,10 @@ export const getDashboard = async (
   }
 };
 
+//#endregion getDashboard
+
+//#region getProfile
+
 export const getProfile = async (
   req: Request,
   res: Response
@@ -102,7 +118,7 @@ export const getProfile = async (
     const db = await getDatabase();
 
     const [profileRows] = await db.query<any[]>(
-      "SELECT username, email, profile_pic FROM users WHERE id = ?",
+      "SELECT verified, username, email, profile_pic FROM users WHERE id = ?",
       [userId]
     );
 
@@ -121,7 +137,7 @@ export const getProfile = async (
             userId: userId,
             username: profile.username,
             email: profile.email,
-            profile_pic: profile.profile_pic
+            profile_pic: profile.profile_pic,
           },
         },
       },
@@ -133,3 +149,7 @@ export const getProfile = async (
     });
   }
 };
+
+//#endregion getProfile
+
+//#endregion Functions

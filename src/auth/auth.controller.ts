@@ -1,31 +1,33 @@
-import { Request, Response } from "express";
-import { ResultSetHeader, RowDataPacket, Connection } from "mysql2/promise";
-import bcrypt from "bcryptjs";
+//#region Imports
 
-import { hashPassword } from "../utils/hashPassword";
-import { getDatabase } from "../services/databaseConnector";
+import { Request, Response } from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { UserModel } from "../user/user.model";
 import {
   generateAccessToken,
   generateRefreshToken,
-} from "../utils/generateJWT";
+  generateVerificationToken,
+} from "../common/utils/JWT";
+import { sendVerificationEmail } from "./auth.email.service";
 
-async function checkUserExists(
-  db: Connection,
-  username: string
-): Promise<boolean> {
-  const [rows] = await db.query<RowDataPacket[]>(
-    "SELECT username FROM users WHERE username = ? LIMIT 1;",
-    [username]
-  );
+//#endregion Imports
 
-  return rows.length > 0;
-}
+//#region Constants
 
 const responseTemplate = {
   status: "error",
   message: "",
   data: {},
 };
+
+const userModel = new UserModel();
+
+//#endregion Constants
+
+//#region Functions
+
+//#region signup
 
 export async function signup(req: Request, res: Response): Promise<void> {
   const { username, email, password, profile_pic } = req.body;
@@ -39,38 +41,30 @@ export async function signup(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const db = await getDatabase();
-
-    // Check if user already exists
-    const userExists = await checkUserExists(db, username);
-
-    if (userExists) {
+    const existingUser = await userModel.getByEmail(email);
+    if (existingUser) {
       res.status(409).json({
         ...responseTemplate,
-        message: "User already exists",
+        message: "Email already exists",
       });
       return;
     }
 
-    const hashedPassword = await hashPassword(password);
-
-    // Insert user into database
-    const result = await db.query<ResultSetHeader>(
-      "INSERT INTO `users` (username, email, password, profile_pic) VALUES (?, ?, ?, ?);",
-      [username, email, hashedPassword, profile_pic]
+    const userId = await userModel.createUser(
+      username,
+      email,
+      password,
+      profile_pic
     );
 
-    const userId = result[0].insertId;
+    const veificationToken = generateVerificationToken(userId);
+    await sendVerificationEmail(email, veificationToken);
 
     res.status(201).json({
       status: "success",
-      message: "User created successfully",
+      message: "User created successfully. Please verify your email.",
       data: {
-        authentication: {
-          oldAccessToken: null,
-          newAccessToken: null,
-        },
-        payload: {
+        user: {
           userId: userId,
         },
       },
@@ -84,10 +78,13 @@ export async function signup(req: Request, res: Response): Promise<void> {
   }
 }
 
+//#endregion signup
+
+//#region login
+
 export async function login(req: Request, res: Response): Promise<void> {
   const { username, password } = req.body;
 
-  // Check if username and password are provided
   if (!username || !password) {
     res.status(400).json({
       ...responseTemplate,
@@ -97,12 +94,9 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   try {
-    const db = await getDatabase();
+    const user = await userModel.getByUsername(username);
 
-    // Check if user exists
-    const userExists = await checkUserExists(db, username);
-
-    if (!userExists) {
+    if (!user) {
       res.status(400).json({
         ...responseTemplate,
         message: "User does not exist",
@@ -110,15 +104,17 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Get user data from database
-    const [rows] = await db.query<RowDataPacket[]>(
-      "SELECT id, username, password FROM users WHERE username = ? LIMIT 1;",
-      [username]
-    );
+    if (!user.verified) {
+      const veificationToken = generateVerificationToken(user.id);
+      await sendVerificationEmail(user.email, veificationToken);
 
-    const user = rows[0];
+      res.status(401).json({
+        ...responseTemplate,
+        message: "User not verified",
+      });
+      return;
+    }
 
-    // Check if password is valid
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       res.status(400).json({
@@ -128,11 +124,9 @@ export async function login(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Create JWT tokens
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
 
-    // Set token in cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -149,7 +143,7 @@ export async function login(req: Request, res: Response): Promise<void> {
           oldAccessToken: null,
           newAccessToken: accessToken,
         },
-        payload: {
+        user: {
           userId: user.id,
         },
       },
@@ -163,7 +157,11 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 }
 
-export function logout(req: Request, res: Response): void {
+//#endregion login
+
+//#region logout
+
+export async function logout(req: Request, res: Response): Promise<void> {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -179,3 +177,64 @@ export function logout(req: Request, res: Response): void {
     message: "Logout successful",
   });
 }
+
+//#endregion logout
+
+//#region verifyEmail
+
+export async function verifyEmail(req: Request, res: Response): Promise<void> {
+  const { token } = req.body;
+
+  if (!token) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Token is missing",
+    });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token as string,
+      process.env.JWT_EMAIL_SECRET as string
+    ) as { userId: number };
+
+    const user = await userModel.getById(decoded.userId);
+    if (!user) {
+      res.status(400).json({
+        ...responseTemplate,
+        message: "User not found",
+      });
+      return;
+    }
+
+    if (user.verified) {
+      res.status(400).json({
+        ...responseTemplate,
+        message: "User already verified",
+      });
+      return;
+    }
+
+    await userModel.verifyUser(user.id);
+    res.status(200).json({
+      status: "success",
+      message: "Email verified successfully",
+      data: {
+        user: {
+          userId: user.id,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ...responseTemplate,
+      message: "Server error",
+    });
+  }
+}
+
+//#endregion verifyEmail
+
+//#endregion Functions
