@@ -138,6 +138,19 @@ export class UserModel {
   }
 
   //#endregion VerifyUser
+
+  //#region updateEmail
+
+  async updateEmail(userId: number, newEmail: string): Promise<void> {
+    try {
+      await this.db.query("UPDATE users SET email = ?, verified = false WHERE id = ?", [newEmail, userId]);
+    } catch (error) {
+      console.error("Error in updateEmail:", error);
+      throw error;
+    }
+  }
+
+  //#endregion updateEmail
 }
 
 //#endregion UserModel

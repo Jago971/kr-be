@@ -9,7 +9,8 @@ import {
   generateRefreshToken,
   generateVerificationToken,
 } from "../common/utils/JWT";
-import { sendVerificationEmail } from "./auth.email.service";
+import { sendEmailChange, sendEmailVerification } from "./auth.email.service";
+import { verifyAccessToken } from "../common/middleware/validateJWT";
 
 //#endregion Imports
 
@@ -58,7 +59,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
     );
 
     const veificationToken = generateVerificationToken(userId);
-    await sendVerificationEmail(email, veificationToken);
+    await sendEmailVerification(email, veificationToken);
 
     res.status(201).json({
       status: "success",
@@ -106,7 +107,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 
     if (!user.verified) {
       const veificationToken = generateVerificationToken(user.id);
-      await sendVerificationEmail(user.email, veificationToken);
+      await sendEmailVerification(user.email, veificationToken);
 
       res.status(401).json({
         ...responseTemplate,
@@ -183,7 +184,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 //#region verifyEmail
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
-  const { token } = req.body;
+  const { token } = req.query;
 
   if (!token) {
     res.status(400).json({
@@ -236,5 +237,120 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
 }
 
 //#endregion verifyEmail
+
+//#region changeEmail
+
+export async function changeEmail(req: Request, res: Response): Promise<void> {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Email is required",
+    });
+    return;
+  }
+
+  try {
+    const userExists = await userModel.getByEmail(email);
+
+    if (!userExists) {
+      res.status(400).json({
+        ...responseTemplate,
+        message: "No account found with this email.",
+      });
+      return;
+    }
+
+    const verificationToken = generateVerificationToken(userExists.id);
+    await sendEmailChange(email, verificationToken);
+
+    res.status(200).json({
+      status: "success",
+      message: "Email update link sent to current email address.",
+      data: {
+        user: {
+          userId: userExists.id,
+          email: userExists.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ...responseTemplate,
+      message: "Server error",
+    });
+  }
+}
+
+//#endregion changeEmail
+
+//#region updateEmail
+
+export async function updateEmail(req: Request, res: Response): Promise<void> {
+  const { token, oldEmail, newEmail } = req.body;
+
+  if (!token || !oldEmail || !newEmail) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Token, old email, and new email are required",
+    });
+    return;
+  }
+
+  if (oldEmail === newEmail) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Old email and new email cannot be the same",
+    });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(
+      token as string,
+      process.env.JWT_EMAIL_SECRET as string
+    ) as { userId: number };
+
+    const user = await userModel.getById(decoded.userId);
+    if (!user) {
+      res.status(400).json({
+        ...responseTemplate,
+        message: "User not found",
+      });
+      return;
+    }
+
+    const emailExists = await userModel.getByEmail(newEmail);
+    if (emailExists) {
+      res.status(409).json({
+        ...responseTemplate,
+        message: "Cannot use this email",
+      });
+      return;
+    }
+
+    await userModel.updateEmail(user.id, newEmail);
+    res.status(200).json({
+      status: "success",
+      message: "Email updated successfully",
+      data: {
+        user: {
+          userId: user.id,
+          email: newEmail,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ...responseTemplate,
+      message: "Server error",
+    });
+  }
+}
+
+//#endregion updateEmail
 
 //#endregion Functions
