@@ -9,7 +9,7 @@ import {
   generateRefreshToken,
   generateVerificationToken,
 } from "../common/utils/JWT";
-import { sendEmailChange, sendEmailVerification } from "./auth.email.service";
+import { sendEmailChange, sendEmailVerification, sendPasswordChange } from "./auth.email.service";
 import { verifyAccessToken } from "../common/middleware/validateJWT";
 
 //#endregion Imports
@@ -31,12 +31,20 @@ const userModel = new UserModel();
 //#region signup
 
 export async function signup(req: Request, res: Response): Promise<void> {
-  const { username, email, password, profile_pic } = req.body;
+  const { username, email, password, confirmPassword, profile_pic } = req.body;
 
-  if (!username || !email || !password) {
+  if (!username || !email || !password || !confirmPassword) {
     res.status(400).json({
       ...responseTemplate,
       message: "Username, email, and password are required",
+    });
+    return;
+  }
+
+  if(password !== confirmPassword) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Password and Confirm-password do not match",
     });
     return;
   }
@@ -352,5 +360,53 @@ export async function updateEmail(req: Request, res: Response): Promise<void> {
 }
 
 //#endregion updateEmail
+
+//redgion changePassword
+
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({
+      ...responseTemplate,
+      message: "Email is required",
+    });
+    return;
+  }
+
+  try {
+    const userExists = await userModel.getByEmail(email);
+
+    if (!userExists) {
+      res.status(400).json({
+        ...responseTemplate,
+        message: "No account found with this email.",
+      });
+      return;
+    }
+
+    const verificationToken = generateVerificationToken(userExists.id);
+    await sendPasswordChange(email, verificationToken);
+
+    res.status(200).json({
+      status: "success",
+      message: "Password update link sent to current email address.",
+      data: {
+        user: {
+          userId: userExists.id,
+          email: userExists.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      ...responseTemplate,
+      message: "Server error",
+    });
+  } 
+}
+
+// endregion changePassword
 
 //#endregion Functions

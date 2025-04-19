@@ -40,6 +40,10 @@ export const sendEmailVerification = async (email: string, token: string) => {
   }
 };
 
+//#endregion SendVerificationEmail
+
+//#region SendPasswordResetEmail
+
 export const sendEmailChange = async (email: string, token: string) => {
   const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
@@ -62,4 +66,30 @@ export const sendEmailChange = async (email: string, token: string) => {
   }
 };
 
-//#endregion SendVerificationEmail
+//#endregion SendPasswordResetEmail
+
+// #region SendPasswordResetEmail
+
+export const sendPasswordChange = async (email: string, token: string) => {
+  const verificationLink = `${process.env.FRONTEND_URL}/change-password?token=${token}`;
+
+  const mailOptions = {
+    from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+    to: email,
+    subject: "You requested to change your password",
+    html: `
+      <p>You requested to change your password. To proced wwth this change, please click the link below:</p>
+      <a href="${verificationLink}">${verificationLink}</a>
+      <p>This link will expire in 1 hour.</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending password change email:", error);
+    throw new Error("Error sending email");
+  }
+};
+
+// #endregion SendPasswordResetEmail
